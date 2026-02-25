@@ -1,9 +1,62 @@
 const userModel = require("../models/user.model");
-const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+async function registerController(req, res) {
+  const { email, username, password, bio, profileImage } = req.body;
 
-async function loginController (req, res) {
+  const isUserAlreadyExists = await userModel.findOne({
+    $or: [{ username }, { email }],
+  });
+
+  if (isUserAlreadyExists) {
+    return res.status(409).json({
+      message:
+        "User already Exists " +
+        (isUserAlreadyExists.email == email
+          ? "Email already exists"
+          : "Username already exists"),
+    });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  const user = await userModel.create({
+    username,
+    email,
+    bio,
+    profileImage,
+    password: hash,
+  });
+
+  const token = jwt.sign(
+    {
+      /*
+        - user ka data hona chahiye,
+        - data unique hona chahiye
+    */
+
+      id: user._id,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" },
+  );
+
+  res.cookie("token", token);
+
+  res.status(200).json({
+    message: "User Registered Successfully",
+    user: {
+      name: user.username,
+      email: user.email,
+      bio: user.bio,
+      profileImage: user.profileImage,
+    },
+    token,
+  });
+}
+
+async function loginController(req, res) {
   const { username, email, password } = req.body;
 
   /*
@@ -18,50 +71,43 @@ async function loginController (req, res) {
       },
       {
         // condition - 2
-        email: email
+        email: email,
       },
     ],
   });
 
-  if(!user){
+  if (!user) {
     return res.status(404).json({
-        message: "User not found"
-    })
-
-
+      message: "User not found",
+    });
   }
 
-  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  const isPasswordValid = await bcrypt.compare(password, user.password);
 
-  const isPasswordValid = hash == user.password
-
-
-  if(!isPasswordValid){
+  if (!isPasswordValid) {
     return res.status(401).json({
-        message: "Invalid Password"
-    })
+      message: "Invalid Password",
+    });
   }
 
-  const token = jwt.sign(
-    {id: user._id},
-    process.env.JWT_SECRET,
-    {expiresIn: '1d'}
-  )
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: "1d",
+  });
 
-  res.cookie("token", token)
+  res.cookie("token", token);
 
   res.status(200).json({
     message: "User LoggedIn Successfully",
     user: {
-        username: user.username,
-        email: user.email,
-        bio: user.bio,
-        profileImage : user.profileImage
-    }
-  })
+      username: user.username,
+      email: user.email,
+      bio: user.bio,
+      profileImage: user.profileImage,
+    },
+  });
 }
-
 
 module.exports = {
-    loginController
-}
+  registerController,
+  loginController,
+};

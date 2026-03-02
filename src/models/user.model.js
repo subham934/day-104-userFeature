@@ -6,15 +6,18 @@ const userSchema = new mongoose.Schema({
         unique: [true, "User name already exists"],
         required: [true, "username is required"]
     },
+    
     email:{
         type: String,
         unique: [true, "Email already exists"],
         required: [true, "Email is required"],
     },
+
     password:{
         type: String,
         required: [true, 'Password is required'],
     },
+    
     bio: String,
     profileImage: {
         type: String,

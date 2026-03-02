@@ -1,7 +1,7 @@
 const postModel = require("../models/post.model");
 const Imagekit = require("@imagekit/nodejs");
 const { toFile } = require("@imagekit/nodejs");
-const jwt = require("jsonwebtoken")
+
 
 
 const imagekit = new Imagekit({
@@ -9,131 +9,67 @@ const imagekit = new Imagekit({
 });
 
 async function createPostController(req, res) {
-  
   // console.log(req.body, req.file);
-
-  const token = req.cookies.token;
-
-  if(!token){
-    return res.status(401).json({
-      message: "Token not provided, unauthorized access."
-    })
-  }  
-
-    let decoded = null
-
-    try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET)
-    } catch (err) {
-        return res.status(401).json({
-            message: "user not authorized"
-        })
-    }
 
   const file = await imagekit.files.upload({
     file: await toFile(Buffer.from(req.file.buffer), "file"),
     fileName: "Test",
-    folder: "cohort-2-instagram"
+    folder: "cohort-2-instagram",
   });
 
   const post = await postModel.create({
     caption: req.body.caption,
     imgUrl: file.url,
-    user:decoded.id
-  })
+    user: req.user.id,
+  });
 
   res.status(201).json({
     message: "Post created Successfully",
-    post
-  })
-
-
+    post,
+  });
 }
 
 async function getPostController(req, res) {
-  const token = req.cookies.token;
-  
-  
-  if(!token){
-    return res.status(401).json({
-      message: "Unauthorized access"
-    })
-  }
-  
   // this token helps us find out token from that perticular user, it help us figure out that the request came from that perticular user
 
-  let decoded = null;
-  try{
-    decoded = jwt.verify(token, process.env.JWT_SECRET)
-  }
-  catch(err){
-    return res.status(401).json({
-      message: "Token Invalid"
-    })
-  }
-
-  const userId = decoded.id;
+  const userId = req.user.id;
 
   const posts = await postModel.find({
-    user: userId
-  })
+    user: userId,
+  });
 
-  res.status(200)
-     .json({
-      message: "Posts fetched successfully.",
-      posts  
-     }) 
-    
+  res.status(200).json({
+    message: "Posts fetched successfully.",
+    posts,
+  });
 }
 
-async function getPostDetailsController(req, res){
-  
-  const token = req.cookies.token
+async function getPostDetailsController(req, res) {
+  const userId = req.user.id;
+  const postId = req.params.postId;
 
-  if(!token){
-    return res.status(401).json({
-      message: "Unauthorized access"
-    })
-  }
+  const post = await postModel.findById(postId);
 
-
-  let decoded;
-  
-  try{
-    decoded = jwt.verify(token, process.env.JWT_SECRET)
-  }
-  catch(err){
-    return res.status(401).json({
-      message: "Token Invalid"
-    })
-  }
-
-  const userId = decoded.id
-  const postId = req.params.postId
-
-  const post = await postModel.findById(postId)
-
-  if(!post){
+  if (!post) {
     return res.status(404).json({
-      message: "Post not found."
-    })
+      message: "Post not found.",
+    });
   }
 
   // to check if postId is created by that perticular user
 
-  const isValidUser = post.user.toString() === userId
+  const isValidUser = post.user.toString() === userId;
 
-  if(!isValidUser){
+  if (!isValidUser) {
     return res.status(403).json({
-      message: "Forbidden Content."
-    })
+      message: "Forbidden Content.",
+    });
   }
 
   return res.status(200).json({
     message: "Post fetched successfully.",
-    post
-  })
-
+    post,
+  });
 }
 
 module.exports = { createPostController, getPostController, getPostDetailsController };
